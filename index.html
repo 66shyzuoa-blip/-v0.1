@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>三國倖存者 V0.1</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#172018;color:#fff;font-family:system-ui,"Noto Sans TC",sans-serif;touch-action:none}
+#game{position:absolute;inset:0}canvas{display:block}
+#hud{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:8px;align-items:flex-start;pointer-events:none}
+.panel{background:#111c;color:#fff;border:1px solid #ffffff35;border-radius:10px;padding:8px 11px;backdrop-filter:blur(5px);font-size:13px;text-shadow:0 1px 2px #000}
+#stats{min-width:148px}#bars{margin-top:5px;width:100%;height:7px;background:#512c2c;border-radius:6px;overflow:hidden}#hpbar{height:100%;width:100%;background:#d94b42}
+#xpwrap{height:5px;background:#293b54;border-radius:5px;overflow:hidden;margin-top:5px}#xpbar{height:100%;width:0;background:#5bb7ff}
+#timer{margin-left:auto;font-size:18px;font-weight:800}
+#hint{position:absolute;top:92px;left:50%;transform:translateX(-50%);white-space:nowrap}
+#stick{position:absolute;left:24px;bottom:26px;width:124px;height:124px;border-radius:50%;background:#ffffff20;border:2px solid #ffffff55;display:none;touch-action:none}
+#knob{position:absolute;left:36px;top:36px;width:48px;height:48px;border-radius:50%;background:#ffffffaa}
+#skillModal,#endModal{position:absolute;inset:0;background:#000a;display:none;align-items:center;justify-content:center;padding:20px}
+.modal{width:min(520px,100%);background:#202b25;border:1px solid #ffffff55;border-radius:16px;padding:20px;box-shadow:0 10px 40px #0009}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+button{border:1px solid #d8c18b;background:#6d5732;color:#fff;border-radius:12px;padding:14px 9px;font-weight:700;font-size:14px;min-height:90px}
+button:active{transform:scale(.97)}.sub{font-size:12px;color:#c9d3ca;font-weight:400;display:block;margin-top:7px}
+#start{position:absolute;inset:0;background:linear-gradient(#101a16dd,#101a16ee);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
+#start .modal{max-width:440px}#start button{min-height:48px;width:100%;margin-top:12px}
+@media(min-width:800px){#stick{display:none!important}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+ <div class="panel" id="stats"><b>武將 Lv.<span id="level">1</span></b><div>生命 <span id="hp">100</span>/100</div><div id="bars"><div id="hpbar"></div></div><div style="margin-top:5px">經驗 <span id="xp">0</span>/<span id="need">5</span></div><div id="xpwrap"><div id="xpbar"></div></div><div style="margin-top:5px">擊殺 <span id="kills">0</span></div></div>
+ <div class="panel" id="timer">00:00</div>
+</div>
+<div class="panel" id="hint">WASD / 方向鍵移動・自動攻擊最近敵人</div>
+<div id="stick"><div id="knob"></div></div>
+<div id="skillModal"><div class="modal"><h2>武將突破！選擇一項能力</h2><div class="cards" id="skillCards"></div></div></div>
+<div id="endModal"><div class="modal" style="text-align:center"><h2 id="endTitle">戰鬥結束</h2><p id="endText"></p><button onclick="location.reload()">重新開始</button></div></div>
+<div id="start"><div class="modal"><h1>三國倖存者</h1><p>V0.1・第一張戰場測試版</p><p style="color:#c9d3ca;font-size:14px">固定斜俯視角｜武將單人戰鬥｜自動攻擊｜技能三選一</p><p style="color:#d7bd83;font-size:12px">目前使用程式生成的測試模型，正式美術將於後續替換。</p><button id="startBtn">進入戰場</button></div></div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+const root=document.getElementById('game');
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x829078); scene.fog=new THREE.Fog(0x829078,28,75);
+const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,150);
+camera.position.set(0,18,22); camera.lookAt(0,0,0);
+const renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,1.7)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; root.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xdde8ff,0x4a5035,2));
+const sun=new THREE.DirectionalLight(0xffe0b0,2.5); sun.position.set(-8,18,9); sun.castShadow=true; sun.shadow.mapSize.set(1024,1024); scene.add(sun);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:0x596d43,roughness:1})); ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+const grid=new THREE.GridHelper(100,50,0x78865b,0x66784d); grid.position.y=.015; scene.add(grid);
+function mat(c,rough=0.8){return new THREE.MeshStandardMaterial({color:c,roughness:rough})}
+const stone=mat(0x777565), wood=mat(0x59402a), grass=mat(0x314c2d);
+for(let i=0;i<34;i++){let x=(Math.random()-.5)*58,z=(Math.random()-.5)*58;if(Math.abs(x)<5&&Math.abs(z)<5)continue;
+ let rock=new THREE.Mesh(new THREE.DodecahedronGeometry(.25+Math.random()*.55,0),stone);rock.position.set(x,.25,z);rock.scale.y=.5+Math.random();rock.castShadow=true;scene.add(rock);
+ if(i%3===0){let trunk=new THREE.Mesh(new THREE.CylinderGeometry(.12,.18,1.3,7),wood);trunk.position.set(x+1,.65,z+1);trunk.castShadow=true;scene.add(trunk);let crown=new THREE.Mesh(new THREE.ConeGeometry(.85,2,7),grass);crown.position.set(x+1,2,z+1);crown.castShadow=true;scene.add(crown);}
+}
+function makeWarrior(color=0x9b2923,enemy=false){
+ const g=new THREE.Group(); const armor=mat(color), skin=mat(enemy?0xb98a68:0xd3a47d), dark=mat(0x292b2b), gold=mat(0xb99a50);
+ const body=new THREE.Mesh(new THREE.CylinderGeometry(.34,.48,.9,8),armor);body.position.y=1.05;body.castShadow=true;g.add(body);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.25,12,10),skin);head.position.y=1.72;head.castShadow=true;g.add(head);
+ const helmet=new THREE.Mesh(new THREE.ConeGeometry(.29,.35,8),gold);helmet.position.y=1.98;g.add(helmet);
+ for(const s of [-1,1]){let arm=new THREE.Mesh(new THREE.CylinderGeometry(.11,.13,.65,7),armor);arm.position.set(s*.42,1.18,0);arm.rotation.z=s*.35;g.add(arm);let leg=new THREE.Mesh(new THREE.CylinderGeometry(.13,.16,.58,7),dark);leg.position.set(s*.19,.38,0);g.add(leg);}
+ const sword=new THREE.Mesh(new THREE.BoxGeometry(.09,.85,.13),gold);sword.position.set(.62,1.25,.05);sword.rotation.z=-.45;g.add(sword);
+ const base=new THREE.Mesh(new THREE.CircleGeometry(.58,20),new THREE.MeshBasicMaterial({color:enemy?0x9c2929:0x3d9bd1,transparent:true,opacity:.25}));base.rotation.x=-Math.PI/2;base.position.y=.03;g.add(base);
+ return g;
+}
+const player=makeWarrior();scene.add(player);player.position.set(0,0,0);
+const enemies=[],orbs=[];let hp=100,maxHp=100,xp=0,need=5,level=1,kills=0,elapsed=0,spawn=0,attack=0,paused=false,ended=false;
+let damage=10,range=2.6,rate=1.2,area=1,regen=0,crit=0;
+const ui=id=>document.getElementById(id);
+function enemySpawn(){let a=Math.random()*Math.PI*2,r=13+Math.random()*5;let e=makeWarrior(Math.random()<.18?0x675b45:0x4a5551,true);e.position.set(player.position.x+Math.cos(a)*r,0,player.position.z+Math.sin(a)*r);scene.add(e);enemies.push({mesh:e,hp:Math.random()<.18?32:20,speed:1.3+Math.random()*.35,hit:0,boss:false});}
+function orb(x,z){let m=new THREE.Mesh(new THREE.IcosahedronGeometry(.16,1),mat(0x45b9ff));m.position.set(x,.35,z);scene.add(m);orbs.push(m);}
+const skills=[['強力斬擊','基本攻擊傷害 +5',()=>damage+=5],['快速攻擊','攻擊速度提升 20%',()=>rate*=.8],['旋風斬','攻擊範圍提升 35%',()=>area*=1.35],['劍氣','攻擊距離提升 1.2',()=>range+=1.2],['生命強化','最大生命 +25，恢復 25',()=>{maxHp+=25;hp=Math.min(maxHp,hp+25)}],['戰場威壓','每秒恢復 1 點生命',()=>regen+=1]];
+function levelUp(){paused=true;let picks=[...skills].sort(()=>Math.random()-.5).slice(0,3);ui('skillCards').innerHTML='';picks.forEach(s=>{let b=document.createElement('button');b.innerHTML=s[0]+'<span class="sub">'+s[1]+'</span>';b.onclick=()=>{s[2]();paused=false;ui('skillModal').style.display='none';};ui('skillCards').appendChild(b)});ui('skillModal').style.display='flex';}
+function updateHud(){ui('level').textContent=level;ui('hp').textContent=Math.ceil(hp);ui('xp').textContent=xp;ui('need').textContent=need;ui('kills').textContent=kills;ui('hpbar').style.width=(hp/maxHp*100)+'%';ui('xpbar').style.width=(xp/need*100)+'%';}
+function finish(win){ended=true;paused=true;ui('endTitle').textContent=win?'戰場勝利':'武將陣亡';ui('endText').textContent=`生存 ${Math.floor(elapsed)} 秒｜擊殺 ${kills}｜等級 ${level}`;ui('endModal').style.display='flex';}
+const keys={};addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+let joy={x:0,y:0};const stick=ui('stick'),knob=ui('knob');let pointer=null;
+function joyStart(e){pointer=e.pointerId;stick.setPointerCapture(pointer);joyMove(e)}function joyMove(e){if(pointer!==e.pointerId)return;let r=stick.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy,l=Math.hypot(dx,dy),m=42;if(l>m){dx*=m/l;dy*=m/l}joy.x=dx/m;joy.y=dy/m;knob.style.transform=`translate(${dx}px,${dy}px)`}function joyEnd(){pointer=null;joy.x=joy.y=0;knob.style.transform='translate(0,0)'}
+if(innerWidth<800){stick.style.display='block';stick.addEventListener('pointerdown',joyStart);stick.addEventListener('pointermove',joyMove);stick.addEventListener('pointerup',joyEnd);stick.addEventListener('pointercancel',joyEnd)}
+let last=performance.now();function loop(now){requestAnimationFrame(loop);let dt=Math.min((now-last)/1000,.04);last=now;if(!paused&&!ended&&ui('start').style.display!=='none'){
+ elapsed+=dt;spawn+=dt;attack+=dt;if(spawn>Math.max(.35,1.35-elapsed*.008)){spawn=0;enemySpawn()}
+ let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+joy.x,dz=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0)+joy.y;let l=Math.hypot(dx,dz);if(l>1){dx/=l;dz/=l}
+ player.position.x+=dx*5*dt;player.position.z+=dz*5*dt;
+ if(l>.1)player.rotation.y=Math.atan2(dx,dz);
+ if(regen)hp=Math.min(maxHp,hp+regen*dt);
+ for(let e of enemies){let vx=player.position.x-e.mesh.position.x,vz=player.position.z-e.mesh.position.z,d=Math.hypot(vx,vz)||1;e.mesh.position.x+=vx/d*e.speed*dt;e.mesh.position.z+=vz/d*e.speed*dt;e.hit-=dt;if(d<1.05&&e.hit<=0){hp-=5;e.hit=.9}}
+ if(attack>=rate){attack=0;let target=null,best=range*area;for(let e of enemies){let d=e.mesh.position.distanceTo(player.position);if(d<best){best=d;target=e}}if(target){target.hp-=damage;if(target.hp<=0){scene.remove(target.mesh);enemies.splice(enemies.indexOf(target),1);orb(target.mesh.position.x,target.mesh.position.z);kills++;}}}
+ for(let i=orbs.length-1;i>=0;i--){let o=orbs[i];o.rotation.y+=dt*2;if(o.position.distanceTo(player.position)<.9){scene.remove(o);orbs.splice(i,1);xp++;if(xp>=need){xp-=need;level++;need=Math.ceil(need*1.35);levelUp()}}}
+ if(elapsed>=600)finish(true);if(hp<=0)finish(false);
+ ui('timer').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');updateHud();
+}
+camera.position.x=player.position.x;camera.position.z=player.position.z+22;camera.position.y=18;camera.lookAt(player.position.x,0,player.position.z);renderer.render(scene,camera);}
+requestAnimationFrame(loop);
+ui('startBtn').onclick=()=>{ui('start').style.display='none'};
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script>
+</body></html>
