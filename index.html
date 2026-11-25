@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>三國倖存者 V0.1</title>
+<title>三國倖存者 V0.3</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#172018;color:#fff;font-family:system-ui,"Noto Sans TC",sans-serif;touch-action:none}
 #game{position:absolute;inset:0}canvas{display:block}
@@ -12,9 +12,9 @@
 #stats{min-width:148px}#bars{margin-top:5px;width:100%;height:7px;background:#512c2c;border-radius:6px;overflow:hidden}#hpbar{height:100%;width:100%;background:#d94b42}
 #xpwrap{height:5px;background:#293b54;border-radius:5px;overflow:hidden;margin-top:5px}#xpbar{height:100%;width:0;background:#5bb7ff}
 #timer{margin-left:auto;font-size:18px;font-weight:800}
-#hint{position:absolute;top:92px;left:50%;transform:translateX(-50%);white-space:nowrap}
+#hint{pointer-events:none;position:absolute;top:140px;left:50%;transform:translateX(-50%);white-space:nowrap}
 #stick{position:absolute;left:24px;bottom:26px;width:124px;height:124px;border-radius:50%;background:#ffffff20;border:2px solid #ffffff55;display:none;touch-action:none}
-#knob{position:absolute;left:36px;top:36px;width:48px;height:48px;border-radius:50%;background:#ffffffaa}
+#knob{pointer-events:none;position:absolute;left:36px;top:36px;width:48px;height:48px;border-radius:50%;background:#ffffffaa}
 #skillModal,#endModal{position:absolute;inset:0;background:#000a;display:none;align-items:center;justify-content:center;padding:20px}
 .modal{width:min(520px,100%);background:#202b25;border:1px solid #ffffff55;border-radius:16px;padding:20px;box-shadow:0 10px 40px #0009}
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
@@ -23,7 +23,7 @@ button:active{transform:scale(.97)}.sub{font-size:12px;color:#c9d3ca;font-weight
 #start{position:absolute;inset:0;background:linear-gradient(#101a16dd,#101a16ee);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
 #start .modal{max-width:440px}#start button{min-height:48px;width:100%;margin-top:12px}
 @media(min-width:800px){#stick{display:none!important}}
-</style>
+.panel,.modal{background:#211a13e8;border-color:#a58b57;color:#f4e4c3}#hint{top:115px;font-size:11px}#stick{bottom:36px;z-index:3;border-color:#bca16c}#start,#skillModal,#endModal{z-index:5} </style>
 </head>
 <body>
 <div id="game"></div>
@@ -31,38 +31,29 @@ button:active{transform:scale(.97)}.sub{font-size:12px;color:#c9d3ca;font-weight
  <div class="panel" id="stats"><b>武將 Lv.<span id="level">1</span></b><div>生命 <span id="hp">100</span>/100</div><div id="bars"><div id="hpbar"></div></div><div style="margin-top:5px">經驗 <span id="xp">0</span>/<span id="need">5</span></div><div id="xpwrap"><div id="xpbar"></div></div><div style="margin-top:5px">擊殺 <span id="kills">0</span></div></div>
  <div class="panel" id="timer">00:00</div>
 </div>
-<div class="panel" id="hint">WASD / 方向鍵移動・自動攻擊最近敵人</div>
+<div class="panel" id="hint">拖曳搖桿／方向鍵・自動攻擊</div>
 <div id="stick"><div id="knob"></div></div>
 <div id="skillModal"><div class="modal"><h2>武將突破！選擇一項能力</h2><div class="cards" id="skillCards"></div></div></div>
 <div id="endModal"><div class="modal" style="text-align:center"><h2 id="endTitle">戰鬥結束</h2><p id="endText"></p><button onclick="location.reload()">重新開始</button></div></div>
-<div id="start"><div class="modal"><h1>三國倖存者</h1><p>V0.1・第一張戰場測試版</p><p style="color:#c9d3ca;font-size:14px">固定斜俯視角｜武將單人戰鬥｜自動攻擊｜技能三選一</p><p style="color:#d7bd83;font-size:12px">目前使用程式生成的測試模型，正式美術將於後續替換。</p><button id="startBtn">進入戰場</button></div></div>
+<div id="start"><div class="modal"><h1>三國倖存者</h1><p>V0.3・古戰場美術測試版</p><p style="color:#c9d3ca;font-size:14px">固定斜俯視角｜武將單人戰鬥｜自動攻擊｜技能三選一</p><p style="color:#d7bd83;font-size:12px">本版採程序化盔甲與泥土地形，正式寫實模型尚待整合。</p><button id="startBtn">進入戰場</button></div></div>
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 const root=document.getElementById('game');
-const scene=new THREE.Scene(); scene.background=new THREE.Color(0x829078); scene.fog=new THREE.Fog(0x829078,28,75);
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x918575); scene.fog=new THREE.Fog(0x918575,28,75);
 const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,150);
 camera.position.set(0,18,22); camera.lookAt(0,0,0);
 const renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,1.7)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; root.appendChild(renderer.domElement);
 scene.add(new THREE.HemisphereLight(0xdde8ff,0x4a5035,2));
 const sun=new THREE.DirectionalLight(0xffe0b0,2.5); sun.position.set(-8,18,9); sun.castShadow=true; sun.shadow.mapSize.set(1024,1024); scene.add(sun);
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:0x596d43,roughness:1})); ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
-const grid=new THREE.GridHelper(100,50,0x78865b,0x66784d); grid.position.y=.015; scene.add(grid);
-function mat(c,rough=0.8){return new THREE.MeshStandardMaterial({color:c,roughness:rough})}
-const stone=mat(0x777565), wood=mat(0x59402a), grass=mat(0x314c2d);
-for(let i=0;i<34;i++){let x=(Math.random()-.5)*58,z=(Math.random()-.5)*58;if(Math.abs(x)<5&&Math.abs(z)<5)continue;
- let rock=new THREE.Mesh(new THREE.DodecahedronGeometry(.25+Math.random()*.55,0),stone);rock.position.set(x,.25,z);rock.scale.y=.5+Math.random();rock.castShadow=true;scene.add(rock);
- if(i%3===0){let trunk=new THREE.Mesh(new THREE.CylinderGeometry(.12,.18,1.3,7),wood);trunk.position.set(x+1,.65,z+1);trunk.castShadow=true;scene.add(trunk);let crown=new THREE.Mesh(new THREE.ConeGeometry(.85,2,7),grass);crown.position.set(x+1,2,z+1);crown.castShadow=true;scene.add(crown);}
-}
-function makeWarrior(color=0x9b2923,enemy=false){
- const g=new THREE.Group(); const armor=mat(color), skin=mat(enemy?0xb98a68:0xd3a47d), dark=mat(0x292b2b), gold=mat(0xb99a50);
- const body=new THREE.Mesh(new THREE.CylinderGeometry(.34,.48,.9,8),armor);body.position.y=1.05;body.castShadow=true;g.add(body);
- const head=new THREE.Mesh(new THREE.SphereGeometry(.25,12,10),skin);head.position.y=1.72;head.castShadow=true;g.add(head);
- const helmet=new THREE.Mesh(new THREE.ConeGeometry(.29,.35,8),gold);helmet.position.y=1.98;g.add(helmet);
- for(const s of [-1,1]){let arm=new THREE.Mesh(new THREE.CylinderGeometry(.11,.13,.65,7),armor);arm.position.set(s*.42,1.18,0);arm.rotation.z=s*.35;g.add(arm);let leg=new THREE.Mesh(new THREE.CylinderGeometry(.13,.16,.58,7),dark);leg.position.set(s*.19,.38,0);g.add(leg);}
- const sword=new THREE.Mesh(new THREE.BoxGeometry(.09,.85,.13),gold);sword.position.set(.62,1.25,.05);sword.rotation.z=-.45;g.add(sword);
- const base=new THREE.Mesh(new THREE.CircleGeometry(.58,20),new THREE.MeshBasicMaterial({color:enemy?0x9c2929:0x3d9bd1,transparent:true,opacity:.25}));base.rotation.x=-Math.PI/2;base.position.y=.03;g.add(base);
- return g;
-}
+function mat(c,rough=.85){return new THREE.MeshStandardMaterial({color:c,roughness:rough})}
+let cv=document.createElement('canvas');cv.width=cv.height=512;let ctx=cv.getContext('2d');ctx.fillStyle='#78634a';ctx.fillRect(0,0,512,512);for(let i=0;i<26000;i++){let x=Math.random()*512,y=Math.random()*512,r=Math.random()*5+.5;ctx.fillStyle=['#5b4935','#a18a65','#88704d','#696244','#4d4934'][i%5];ctx.globalAlpha=.12+Math.random()*.35;ctx.fillRect(x,y,r,r*.6)}ctx.globalAlpha=1;let tex=new THREE.CanvasTexture(cv);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.repeat.set(20,20);tex.colorSpace=THREE.SRGBColorSpace;
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(180,180),new THREE.MeshStandardMaterial({map:tex,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+const stone=mat(0x777064),wood=mat(0x493321),cloth=mat(0x792b22),leaf=mat(0x625c36),iron=mat(0x4b4b48,.5),gold=mat(0x9c7840,.55),steel=mat(0xb8b7ad,.3),skin=mat(0xb88e6d),dark=mat(0x302923);
+function mesh(g,geo,m,x,y,z){let o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.castShadow=true;g.add(o);return o}
+const box=(g,m,x,y,z,w,h,d)=>mesh(g,new THREE.BoxGeometry(w,h,d),m,x,y,z);
+const cyl=(g,m,x,y,z,a,b,h)=>mesh(g,new THREE.CylinderGeometry(a,b,h,8),m,x,y,z);
+for(let i=0;i<100;i++){let x=(Math.random()-.5)*100,z=(Math.random()-.5)*100;if(Math.hypot(x,z)<5)continue;let g=new THREE.Group();g.position.set(x,0,z);scene.add(g);if(i%9===0){cyl(g,wood,0,1.8,0,.045,.065,3.6);box(g,cloth,.55,2.9,0,1.1,.9,.035);box(g,gold,.55,3.32,.025,1.1,.06,.04);box(g,gold,.55,2.5,.025,1.1,.06,.04);}else if(i%13===0){let tent=mesh(g,new THREE.CylinderGeometry(0,1.8,2.3,4),mat(0x9a8869),0,1.15,0);tent.rotation.y=Math.PI/4;}else{let r=mesh(g,new THREE.DodecahedronGeometry(.2+Math.random()*.45),stone,0,.15,0);r.scale.set(1,.5,.8);for(let j=0;j<5;j++){let blade=box(g,leaf,Math.random()-.5,.12,Math.random()-.5,.035,.24,.035);blade.rotation.z=Math.random()-.5;}}}
+function makeWarrior(color=0x792b22,enemy=false){let g=new THREE.Group(),fabric=mat(color);let torso=cyl(g,iron,0,1.24,0,.28,.24,.56);torso.scale.z=.67;let skirt=cyl(g,fabric,0,.82,0,.24,.36,.45);skirt.scale.z=.75;for(let row=0;row<3;row++)for(let col=0;col<4;col++)box(g,row%2?iron:gold,(col-1.5)*.115,1.08+row*.13,.19,.105,.105,.045);box(g,gold,0,.96,0,.55,.09,.37);let head=mesh(g,new THREE.SphereGeometry(.145,12,10),skin,0,1.67,0);head.scale.set(.86,1.2,.9);let helmet=mesh(g,new THREE.SphereGeometry(.17,12,8,0,Math.PI*2,0,Math.PI*.58),iron,0,1.76,0);helmet.scale.y=1.1;box(g,gold,0,1.73,.13,.25,.045,.05);cyl(g,fabric,0,1.96,0,.025,.065,.23);let limbs=[];for(let side of [-1,1]){let leg=new THREE.Group();leg.position.set(side*.13,.65,0);g.add(leg);cyl(leg,dark,0,-.23,0,.095,.075,.46);box(leg,iron,0,-.49,.055,.17,.15,.29);limbs.push(leg);let arm=new THREE.Group();arm.position.set(side*.32,1.43,0);g.add(arm);mesh(arm,new THREE.SphereGeometry(.17,8,6),iron,0,-.02,0).scale.set(1,.65,1);cyl(arm,fabric,0,-.23,0,.085,.065,.4);mesh(arm,new THREE.SphereGeometry(.075,8,6),skin,0,-.46,0);if(side===1){box(arm,steel,0,-.46,.46,.065,.045,.83);box(arm,gold,0,-.46,.13,.22,.065,.06);g.userData.arm=arm;}}g.userData.legs=limbs;if(!enemy){box(g,fabric,0,1.03,-.25,.48,.85,.045);}return g;}
 const player=makeWarrior();scene.add(player);player.position.set(0,0,0);
 const enemies=[],orbs=[];let hp=100,maxHp=100,xp=0,need=5,level=1,kills=0,elapsed=0,spawn=0,attack=0,paused=false,ended=false;
 let damage=10,range=2.6,rate=1.2,area=1,regen=0,crit=0;
@@ -75,21 +66,21 @@ function updateHud(){ui('level').textContent=level;ui('hp').textContent=Math.cei
 function finish(win){ended=true;paused=true;ui('endTitle').textContent=win?'戰場勝利':'武將陣亡';ui('endText').textContent=`生存 ${Math.floor(elapsed)} 秒｜擊殺 ${kills}｜等級 ${level}`;ui('endModal').style.display='flex';}
 const keys={};addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 let joy={x:0,y:0};const stick=ui('stick'),knob=ui('knob');let pointer=null;
-function joyStart(e){pointer=e.pointerId;stick.setPointerCapture(pointer);joyMove(e)}function joyMove(e){if(pointer!==e.pointerId)return;let r=stick.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy,l=Math.hypot(dx,dy),m=42;if(l>m){dx*=m/l;dy*=m/l}joy.x=dx/m;joy.y=dy/m;knob.style.transform=`translate(${dx}px,${dy}px)`}function joyEnd(){pointer=null;joy.x=joy.y=0;knob.style.transform='translate(0,0)'}
+function joyStart(e){pointer=e.pointerId;try{stick.setPointerCapture(pointer)}catch{};joyMove(e)}function joyMove(e){if(pointer!==e.pointerId)return;let r=stick.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,dx=e.clientX-cx,dy=e.clientY-cy,l=Math.hypot(dx,dy),m=42;if(l>m){dx*=m/l;dy*=m/l}joy.x=dx/m;joy.y=dy/m;knob.style.transform=`translate(${dx}px,${dy}px)`}function joyEnd(){pointer=null;joy.x=joy.y=0;knob.style.transform='translate(0,0)'}
 if(innerWidth<800){stick.style.display='block';stick.addEventListener('pointerdown',joyStart);stick.addEventListener('pointermove',joyMove);stick.addEventListener('pointerup',joyEnd);stick.addEventListener('pointercancel',joyEnd)}
-let last=performance.now();function loop(now){requestAnimationFrame(loop);let dt=Math.min((now-last)/1000,.04);last=now;if(!paused&&!ended&&ui('start').style.display!=='none'){
- elapsed+=dt;spawn+=dt;attack+=dt;if(spawn>Math.max(.35,1.35-elapsed*.008)){spawn=0;enemySpawn()}
+let last=performance.now();function loop(now){requestAnimationFrame(loop);let dt=Math.min((now-last)/1000,.04);last=now;if(!paused&&!ended&&ui('start').style.display==='none'){
+ elapsed+=dt;spawn+=dt;attack+=dt;if(enemies.length<65&&spawn>Math.max(.35,1.35-elapsed*.008)){spawn=0;enemySpawn()}
  let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+joy.x,dz=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0)+joy.y;let l=Math.hypot(dx,dz);if(l>1){dx/=l;dz/=l}
- player.position.x+=dx*5*dt;player.position.z+=dz*5*dt;
- if(l>.1)player.rotation.y=Math.atan2(dx,dz);
+ player.position.x+=dx*5*dt;player.position.z+=dz*5*dt;player.position.x=THREE.MathUtils.clamp(player.position.x,-65,65);player.position.z=THREE.MathUtils.clamp(player.position.z,-65,65);
+ if(l>.1)player.rotation.y=Math.atan2(dx,dz); player.userData.legs.forEach((leg,i)=>leg.rotation.x=l>.1?Math.sin(elapsed*13+i*Math.PI)*.55:0); player.userData.arm.rotation.x=Math.max(0,1-attack/.25)*-1.4;
  if(regen)hp=Math.min(maxHp,hp+regen*dt);
- for(let e of enemies){let vx=player.position.x-e.mesh.position.x,vz=player.position.z-e.mesh.position.z,d=Math.hypot(vx,vz)||1;e.mesh.position.x+=vx/d*e.speed*dt;e.mesh.position.z+=vz/d*e.speed*dt;e.hit-=dt;if(d<1.05&&e.hit<=0){hp-=5;e.hit=.9}}
+ for(let e of enemies){let vx=player.position.x-e.mesh.position.x,vz=player.position.z-e.mesh.position.z,d=Math.hypot(vx,vz)||1;e.mesh.position.x+=vx/d*e.speed*dt;e.mesh.position.z+=vz/d*e.speed*dt;e.mesh.rotation.y=Math.atan2(vx,vz);e.mesh.userData.legs.forEach((leg,i)=>leg.rotation.x=Math.sin(elapsed*9+i*Math.PI)*.4);e.hit-=dt;if(d<1.05&&e.hit<=0){hp-=5;e.hit=.9}}
  if(attack>=rate){attack=0;let target=null,best=range*area;for(let e of enemies){let d=e.mesh.position.distanceTo(player.position);if(d<best){best=d;target=e}}if(target){target.hp-=damage;if(target.hp<=0){scene.remove(target.mesh);enemies.splice(enemies.indexOf(target),1);orb(target.mesh.position.x,target.mesh.position.z);kills++;}}}
  for(let i=orbs.length-1;i>=0;i--){let o=orbs[i];o.rotation.y+=dt*2;if(o.position.distanceTo(player.position)<.9){scene.remove(o);orbs.splice(i,1);xp++;if(xp>=need){xp-=need;level++;need=Math.ceil(need*1.35);levelUp()}}}
  if(elapsed>=600)finish(true);if(hp<=0)finish(false);
  ui('timer').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');updateHud();
 }
-camera.position.x=player.position.x;camera.position.z=player.position.z+22;camera.position.y=18;camera.lookAt(player.position.x,0,player.position.z);renderer.render(scene,camera);}
+camera.position.x=player.position.x;camera.position.z=player.position.z+13;camera.position.y=14;camera.lookAt(player.position.x,0,player.position.z);renderer.render(scene,camera);}
 requestAnimationFrame(loop);
 ui('startBtn').onclick=()=>{ui('start').style.display='none'};
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
