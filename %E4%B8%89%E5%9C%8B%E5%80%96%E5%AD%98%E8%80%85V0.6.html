@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>三國倖存者 V0.6</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#172018;color:#fff;font-family:system-ui,"Noto Sans TC",sans-serif;touch-action:none}
+#game{position:absolute;inset:0}canvas{display:block}
+#hud{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:8px;align-items:flex-start;pointer-events:none}
+.panel{background:#111c;color:#fff;border:1px solid #ffffff35;border-radius:10px;padding:8px 11px;backdrop-filter:blur(5px);font-size:13px;text-shadow:0 1px 2px #000}
+#stats{min-width:148px}#bars{margin-top:5px;width:100%;height:7px;background:#512c2c;border-radius:6px;overflow:hidden}#hpbar{height:100%;width:100%;background:#d94b42}
+#xpwrap{height:5px;background:#293b54;border-radius:5px;overflow:hidden;margin-top:5px}#xpbar{height:100%;width:0;background:#5bb7ff}
+#timer{margin-left:auto;font-size:18px;font-weight:800}
+#hint{pointer-events:none;position:absolute;top:140px;left:50%;transform:translateX(-50%);white-space:nowrap}
+#stick{position:absolute;left:24px;bottom:26px;width:124px;height:124px;border-radius:50%;background:#ffffff20;border:2px solid #ffffff55;display:none;touch-action:none}
+#knob{pointer-events:none;position:absolute;left:36px;top:36px;width:48px;height:48px;border-radius:50%;background:#ffffffaa}
+#skillModal,#endModal{position:absolute;inset:0;background:#000a;display:none;align-items:center;justify-content:center;padding:20px}
+.modal{width:min(520px,100%);background:#202b25;border:1px solid #ffffff55;border-radius:16px;padding:20px;box-shadow:0 10px 40px #0009}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+button{border:1px solid #d8c18b;background:#6d5732;color:#fff;border-radius:12px;padding:14px 9px;font-weight:700;font-size:14px;min-height:90px}
+button:active{transform:scale(.97)}.sub{font-size:12px;color:#c9d3ca;font-weight:400;display:block;margin-top:7px}
+#start{position:absolute;inset:0;background:linear-gradient(#101a16dd,#101a16ee);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
+#start .modal{max-width:440px}#start button{min-height:48px;width:100%;margin-top:12px}
+@media(min-width:800px){#stick{display:none!important}}
+.panel,.modal{background:#211a13e8;border-color:#a58b57;color:#f4e4c3}#hint{top:115px;font-size:11px}#stick{bottom:36px;z-index:3;border-color:#bca16c}#start,#skillModal,#endModal{z-index:5} #stick{pointer-events:none;background:#ffffff18;border-color:#ffffff50}#knob{background:#ffffff59}#hint{z-index:2} @media(min-width:800px){#stick{display:none!important}} #skillModal .modal{animation:reveal .35s ease-out}.cards button{animation:reveal .45s both;min-width:0;padding:10px 4px;background:linear-gradient(#4c3923,#201810)}@keyframes reveal{from{opacity:0;transform:translateY(24px) scale(.92)}to{opacity:1;transform:none}}#mute{position:absolute;right:12px;top:65px;z-index:4;min-height:32px;padding:5px 9px;font-size:12px}</style>
+</head>
+<body>
+<div id="game"></div><button id="mute">音效：開</button>
+<div id="hud">
+ <div class="panel" id="stats"><b>武將 Lv.<span id="level">1</span></b><div>生命 <span id="hp">100</span>/<span id="maxhp">100</span></div><div id="bars"><div id="hpbar"></div></div><div style="margin-top:5px">經驗 <span id="xp">0</span>/<span id="need">5</span></div><div id="xpwrap"><div id="xpbar"></div></div><div style="margin-top:5px">擊殺 <span id="kills">0</span></div></div>
+ <div class="panel" id="timer">00:00</div>
+</div>
+<div class="panel" id="hint">觸碰任意戰場位置拖曳・自動攻擊</div>
+<div id="stick"><div id="knob"></div></div>
+<div id="skillModal"><div class="modal"><h2>武將突破！選擇一項能力</h2><div class="cards" id="skillCards"></div></div></div>
+<div id="endModal"><div class="modal" style="text-align:center"><h2 id="endTitle">戰鬥結束</h2><p id="endText"></p><button onclick="location.reload()">重新開始</button></div></div>
+<div id="start"><div class="modal"><h1>三國倖存者</h1><p>V0.6・骨架動畫測試版</p><p style="color:#c9d3ca;font-size:14px">固定斜俯視角｜武將單人戰鬥｜自動攻擊｜技能三選一</p><p style="color:#d7bd83;font-size:12px">可換裝關節角色・浮動式搖桿</p><button id="startBtn">進入戰場</button></div></div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+const root=document.getElementById('game');
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x918575); scene.fog=new THREE.Fog(0x918575,28,75);
+const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,150);
+camera.position.set(0,18,22); camera.lookAt(0,0,0);
+const renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setPixelRatio(Math.min(devicePixelRatio,1.7)); renderer.setSize(innerWidth,innerHeight); renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap; root.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xdde8ff,0x4a5035,2));
+const sun=new THREE.DirectionalLight(0xffe0b0,2.5); sun.position.set(-8,18,9); sun.castShadow=true; sun.shadow.mapSize.set(1024,1024); scene.add(sun);
+function mat(c,rough=.85){return new THREE.MeshStandardMaterial({color:c,roughness:rough})}
+let cv=document.createElement('canvas');cv.width=cv.height=512;let ctx=cv.getContext('2d');ctx.fillStyle='#78634a';ctx.fillRect(0,0,512,512);for(let i=0;i<26000;i++){let x=Math.random()*512,y=Math.random()*512,r=Math.random()*5+.5;ctx.fillStyle=['#5b4935','#a18a65','#88704d','#696244','#4d4934'][i%5];ctx.globalAlpha=.12+Math.random()*.35;ctx.fillRect(x,y,r,r*.6)}ctx.globalAlpha=1;let tex=new THREE.CanvasTexture(cv);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.repeat.set(20,20);tex.colorSpace=THREE.SRGBColorSpace;
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(180,180),new THREE.MeshStandardMaterial({map:tex,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+const stone=mat(0x777064),wood=mat(0x493321),cloth=mat(0x792b22),leaf=mat(0x625c36),iron=mat(0x4b4b48,.5),gold=mat(0x9c7840,.55),steel=mat(0xb8b7ad,.3),skin=mat(0xb88e6d),dark=mat(0x302923);
+function mesh(g,geo,m,x,y,z){let o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.castShadow=true;g.add(o);return o}
+const box=(g,m,x,y,z,w,h,d)=>mesh(g,new THREE.BoxGeometry(w,h,d),m,x,y,z);
+const cyl=(g,m,x,y,z,a,b,h)=>mesh(g,new THREE.CylinderGeometry(a,b,h,8),m,x,y,z);
+for(let i=0;i<100;i++){let x=(Math.random()-.5)*100,z=(Math.random()-.5)*100;if(Math.hypot(x,z)<5)continue;let g=new THREE.Group();g.position.set(x,0,z);scene.add(g);if(i%9===0){cyl(g,wood,0,1.8,0,.045,.065,3.6);box(g,cloth,.55,2.9,0,1.1,.9,.035);box(g,gold,.55,3.32,.025,1.1,.06,.04);box(g,gold,.55,2.5,.025,1.1,.06,.04);}else if(i%13===0){let tent=mesh(g,new THREE.CylinderGeometry(0,1.8,2.3,4),mat(0x9a8869),0,1.15,0);tent.rotation.y=Math.PI/4;}else{let r=mesh(g,new THREE.DodecahedronGeometry(.2+Math.random()*.45),stone,0,.15,0);r.scale.set(1,.5,.8);for(let j=0;j<5;j++){let blade=box(g,leaf,Math.random()-.5,.12,Math.random()-.5,.035,.24,.035);blade.rotation.z=Math.random()-.5;}}}
+// Articulated hierarchy: hips, torso, upper/lower limbs and independent equipment.
+const geoCache=new Map();function ell(g,m,x,y,z,w,h,d){let key=[w,h,d].join(',');if(!geoCache.has(key)){let q=new THREE.SphereGeometry(1,12,8);q.scale(w,h,d);geoCache.set(key,q)}return mesh(g,geoCache.get(key),m,x,y,z)}
+function joint(g,x,y,z){let p=new THREE.Group();p.position.set(x,y,z);g.add(p);return p}
+const red=mat(0x782b22),blue=mat(0x424e50),linen=mat(0x77604a),black=mat(0x29231e),bronze=mat(0x927047),face=mat(0xb78b68),metal=mat(0x858783,.42);
+function makeWarrior(color,enemy=false){let g=new THREE.Group(),hips=joint(g,0,1.02,0),torso=joint(hips,0,0,0),fabric=enemy?blue:red,armor=enemy?metal:bronze;ell(torso,fabric,0,.30,0,.29,.43,.18);let chest=joint(torso,0,.28,0);ell(chest,armor,0,.10,.035,.30,.30,.19);for(let i=0;i<4;i++)box(chest,armor,0,-.10+i*.10,.15,.47-i*.025,.065,.075);box(torso,black,0,.02,0,.53,.10,.36);ell(torso,fabric,0,-.12,0,.31,.22,.19);let head=joint(torso,0,.72,0);ell(head,face,0,.12,0,.135,.18,.13);ell(head,armor,0,.22,-.015,.16,.14,.15);box(head,armor,0,.16,-.105,.28,.22,.07);if(!enemy)ell(head,red,0,.39,-.045,.045,.15,.045);let arms=[],legs=[];for(let side of [-1,1]){let a=joint(torso,side*.30,.53,0);ell(a,armor,0,-.04,0,.15,.13,.15);ell(a,fabric,0,-.18,0,.085,.19,.09);let elbow=joint(a,0,-.32,0);ell(elbow,armor,0,-.13,0,.075,.15,.08);ell(elbow,face,0,-.28,0,.07,.08,.07);arms.push([a,elbow]);let l=joint(hips,side*.15,-.06,0);ell(l,fabric,0,-.21,0,.12,.23,.12);let knee=joint(l,0,-.43,0);ell(knee,black,0,-.19,0,.09,.22,.10);ell(knee,black,0,-.38,.07,.10,.09,.17);legs.push([l,knee]);}let weapon=joint(arms[1][1],0,-.28,0);weapon.rotation.x=Math.PI/2;if(enemy){cyl(weapon,wood,0,.40,0,.025,.025,1.85);let tip=mesh(weapon,new THREE.ConeGeometry(.075,.28,4),steel,0,1.43,0);}else{cyl(weapon,wood,0,0,0,.035,.035,.22);box(weapon,gold,0,.13,0,.24,.045,.07);let blade=mesh(weapon,new THREE.BoxGeometry(.085,.85,.035),steel,0,.58,0);mesh(weapon,new THREE.ConeGeometry(.045,.15,4),steel,0,1.08,0);}g.userData={hips,torso,arms,legs,weapon,chest,enemy,attack:0,hurt:0,dead:0,phase:Math.random()*6};return g;}
+function pose(g,dx,dz,t,moving){let u=g.userData;if(Math.hypot(dx,dz)>.01)g.rotation.y=Math.atan2(dx,dz);let p=t*11+u.phase,w=moving?1:0;u.hips.position.y=1.02+Math.abs(Math.sin(p))*.055*w;u.torso.rotation.set(.08*w,Math.sin(p)*.10*w,0);for(let i=0;i<2;i++){let k=Math.sin(p+i*Math.PI)*w;u.legs[i][0].rotation.x=k*.72;u.legs[i][1].rotation.x=Math.max(0,-k)*.85;u.arms[i][0].rotation.x=-k*.48;u.arms[i][0].rotation.z=(i?1:-1)*.10;u.arms[i][1].rotation.x=-.28;}if(u.attack>0){let q=1-u.attack/.42;let swing=Math.sin(Math.PI*Math.min(1,q));u.torso.rotation.y=u.enemy?-.18:Math.cos(q*Math.PI)*.75;u.arms[1][0].rotation.x=u.enemy?-1.45*swing:-1.1-.65*swing;u.arms[1][0].rotation.z=u.enemy?.15:1.25*Math.cos(q*Math.PI);u.arms[1][1].rotation.x=-.15-.75*(1-swing);if(u.enemy)u.arms[0][0].rotation.x=-.9*swing;}if(u.hurt>0)u.torso.rotation.x=-.35*Math.sin(u.hurt/.2*Math.PI);}
+const player=makeWarrior();scene.add(player);player.position.set(0,0,0);
+const enemies=[],orbs=[],fallen=[];let hp=100,maxHp=100,xp=0,need=5,level=1,kills=0,elapsed=0,spawn=0,attack=0,paused=false,ended=false;
+let damage=10,range=2.6,rate=1.2,area=1,regen=0,crit=0;
+const ui=id=>document.getElementById(id);
+function enemySpawn(){let a=Math.random()*Math.PI*2,r=13+Math.random()*5;let e=makeWarrior(Math.random()<.18?0x675b45:0x4a5551,true);e.position.set(player.position.x+Math.cos(a)*r,0,player.position.z+Math.sin(a)*r);scene.add(e);enemies.push({mesh:e,hp:Math.random()<.18?32:20,speed:1.3+Math.random()*.35,hit:0,boss:false});}
+function orb(x,z){let m=new THREE.Mesh(new THREE.IcosahedronGeometry(.16,1),mat(0x45b9ff));m.position.set(x,.35,z);scene.add(m);orbs.push(m);}
+const skills=[['強力斬擊','基本攻擊傷害 +5',()=>damage+=5],['快速攻擊','攻擊速度提升 20%',()=>rate*=.8],['旋風斬','攻擊範圍提升 35%',()=>area*=1.35],['劍氣','攻擊距離提升 1.2',()=>range+=1.2],['生命強化','最大生命 +25，恢復 25',()=>{maxHp+=25;hp=Math.min(maxHp,hp+25)}],['戰場威壓','每秒恢復 1 點生命',()=>regen+=1]];
+let audio;let muted=false;function sound(freq,dur){if(!audio||muted)return;let o=audio.createOscillator(),g=audio.createGain();o.type='triangle';o.frequency.setValueAtTime(freq,audio.currentTime);o.frequency.exponentialRampToValueAtTime(freq/3,audio.currentTime+dur);g.gain.setValueAtTime(.12,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+dur);o.connect(g).connect(audio.destination);o.start();o.stop(audio.currentTime+dur)}
+function skillIcon(i){let paths=['M15 45L45 15M36 15H45V24','M12 24H44M12 34H38M12 44H30','M15 34A17 17 0 1 1 35 48M35 48L45 44','M10 46L48 10M20 48L50 20','M30 49C-5 25 15 8 30 22C45 8 65 25 30 49','M30 10L48 20V35L30 50L12 35V20Z'];return `<svg viewBox="0 0 60 60" width="48" height="48" style="display:block;margin:0 auto 8px;background:#241b12;border:1px solid #b89a5b;border-radius:8px"><path d="${paths[i]}" stroke="#f4d18a" stroke-width="4" fill="none" stroke-linecap="round"/></svg>`}
+function levelUp(){sound(650,.35);joyEnd();paused=true;let picks=[...skills].sort(()=>Math.random()-.5).slice(0,3);ui('skillCards').innerHTML='';picks.forEach(s=>{let b=document.createElement('button');b.style.animationDelay=(ui('skillCards').children.length*.12)+'s';b.innerHTML=skillIcon(skills.indexOf(s))+s[0]+'<span class="sub">'+s[1]+'</span>';b.onclick=()=>{sound(420,.2);s[2]();paused=false;ui('skillModal').style.display='none';};ui('skillCards').appendChild(b)});ui('skillModal').style.display='flex';}
+function updateHud(){ui('level').textContent=level;ui('hp').textContent=Math.max(0,Math.ceil(hp));ui('maxhp').textContent=maxHp;ui('xp').textContent=xp;ui('need').textContent=need;ui('kills').textContent=kills;ui('hpbar').style.width=(hp/maxHp*100)+'%';ui('xpbar').style.width=(xp/need*100)+'%';}
+function finish(win){joyEnd();ended=true;paused=true;ui('endTitle').textContent=win?'戰場勝利':'武將陣亡';ui('endText').textContent=`生存 ${Math.floor(elapsed)} 秒｜擊殺 ${kills}｜等級 ${level}`;ui('endModal').style.display='flex';}
+const keys={};addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+let joy={x:0,y:0};const stick=ui('stick'),knob=ui('knob');let pointer=null;
+let origin={x:0,y:0};function joyStart(e){if(pointer!==null||paused||ended||ui('start').style.display!=='none')return;pointer=e.pointerId;origin={x:e.clientX,y:e.clientY};stick.style.left=(origin.x-62)+'px';stick.style.top=(origin.y-62)+'px';stick.style.bottom='auto';stick.style.display='block';try{root.setPointerCapture(pointer)}catch{};joyMove(e)}function joyMove(e){if(pointer!==e.pointerId)return;let dx=e.clientX-origin.x,dy=e.clientY-origin.y,l=Math.hypot(dx,dy),m=42;if(l>m){dx*=m/l;dy*=m/l}joy.x=dx/m;joy.y=dy/m;knob.style.transform=`translate(${dx}px,${dy}px)`}function joyEnd(e){if(e&&e.pointerId!==pointer)return;pointer=null;joy.x=joy.y=0;stick.style.display='none';knob.style.transform='translate(0,0)'}root.addEventListener('pointerdown',joyStart);root.addEventListener('pointermove',joyMove);root.addEventListener('pointerup',joyEnd);root.addEventListener('pointercancel',joyEnd);root.addEventListener('lostpointercapture',joyEnd);addEventListener('blur',()=>joyEnd());
+const effects=[];function slash(p){let m=new THREE.Mesh(new THREE.RingGeometry(.75,1.05,32,1,0,Math.PI*1.3),new THREE.MeshBasicMaterial({color:0xffdb83,transparent:true,opacity:.85,side:THREE.DoubleSide,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.copy(p);m.position.y=.3;scene.add(m);effects.push({m,t:.24});}let pending=null;let last=performance.now();function loop(now){requestAnimationFrame(loop);let dt=Math.min((now-last)/1000,.04);last=now;for(let i=effects.length-1;i>=0;i--){let e=effects[i];e.t-=dt;e.m.material.opacity=Math.max(0,e.t/.24);if(e.t<=0){scene.remove(e.m);e.m.geometry.dispose();e.m.material.dispose();effects.splice(i,1)}}if(!paused&&!ended&&ui('start').style.display==='none'){
+ elapsed+=dt;spawn+=dt;attack+=dt;for(let g of [player,...enemies.map(e=>e.mesh)]){g.userData.attack=Math.max(0,g.userData.attack-dt);g.userData.hurt=Math.max(0,g.userData.hurt-dt);}for(let i=fallen.length-1;i>=0;i--){let f=fallen[i];f.t+=dt;f.g.rotation.x=-Math.min(1,f.t/.45)*Math.PI/2;if(f.t>1.5){scene.remove(f.g);fallen.splice(i,1)}}if(pending){pending.t-=dt;if(pending.t<=0){let target=pending.target;if(enemies.includes(target)&&target.mesh.position.distanceTo(player.position)<range*area+1){target.hp-=damage;target.mesh.userData.hurt=.2;sound(180,.16);slash(target.mesh.position);if(target.hp<=0){enemies.splice(enemies.indexOf(target),1);fallen.push({g:target.mesh,t:0});orb(target.mesh.position.x,target.mesh.position.z);kills++;}}pending=null;}}if(enemies.length<65&&spawn>Math.max(.35,1.35-elapsed*.008)){spawn=0;enemySpawn()}
+ let dx=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+joy.x,dz=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0)+joy.y;let l=Math.hypot(dx,dz);if(l>1){dx/=l;dz/=l}
+ player.position.x+=dx*5*dt;player.position.z+=dz*5*dt;player.position.x=THREE.MathUtils.clamp(player.position.x,-65,65);player.position.z=THREE.MathUtils.clamp(player.position.z,-65,65);
+ if(l>.1){player.userData.dx=dx;player.userData.dz=dz;}pose(player,player.userData.dx||1,player.userData.dz||1,elapsed,l>.1);
+ if(regen)hp=Math.min(maxHp,hp+regen*dt);
+ for(let e of enemies){let vx=player.position.x-e.mesh.position.x,vz=player.position.z-e.mesh.position.z,d=Math.hypot(vx,vz)||1;if(d>1.0){e.mesh.position.x+=vx/d*e.speed*dt;e.mesh.position.z+=vz/d*e.speed*dt;}pose(e.mesh,vx,vz,elapsed,d>1.0);e.hit-=dt;if(d<1.35&&e.hit<=0){e.hit=.95;e.wind=.20;e.mesh.userData.attack=.42;sound(260,.10)}if(e.wind>0){e.wind-=dt;if(e.wind<=0&&d<1.65){hp-=5;player.userData.hurt=.2;sound(95,.12);slash(player.position)}}}
+ if(attack>=rate&&!pending){let target=null,best=range*area;for(let e of enemies){let d=e.mesh.position.distanceTo(player.position);if(d<best){best=d;target=e}}if(target){attack=0;player.userData.attack=.42;player.userData.dx=target.mesh.position.x-player.position.x;player.userData.dz=target.mesh.position.z-player.position.z;pending={target,t:.20};sound(340,.12);}}if(pending)pose(player,player.userData.dx,player.userData.dz,elapsed,false);
+ for(let i=0;i<enemies.length;i++)for(let j=i+1;j<enemies.length;j++){let a=enemies[i].mesh.position,b=enemies[j].mesh.position,x=a.x-b.x,z=a.z-b.z,d=Math.hypot(x,z);if(d<.65&&d>.001){let k=(.65-d)*.5/d;a.x+=x*k;a.z+=z*k;b.x-=x*k;b.z-=z*k;}}
+ for(let i=orbs.length-1;i>=0;i--){let o=orbs[i];o.rotation.y+=dt*2;if(o.position.distanceTo(player.position)<.9){scene.remove(o);orbs.splice(i,1);xp++;if(xp>=need){xp-=need;level++;need=Math.ceil(need*1.35);levelUp()}}}
+ if(elapsed>=600)finish(true);if(hp<=0)finish(false);
+ ui('timer').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');updateHud();
+}
+camera.position.x=player.position.x;camera.position.z=player.position.z+17;camera.position.y=19;camera.lookAt(player.position.x,0,player.position.z);renderer.render(scene,camera);}
+requestAnimationFrame(loop);
+ui('mute').onclick=()=>{muted=!muted;ui('mute').textContent=muted?'音效：關':'音效：開'};
+ui('startBtn').onclick=()=>{try{audio=new (window.AudioContext||window.webkitAudioContext)();audio.resume()}catch{};ui('start').style.display='none'};
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script>
+</body></html>
